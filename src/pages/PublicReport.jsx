@@ -31,11 +31,13 @@ export default function PublicReport() {
       } else {
         // --- 🐛 통계 계산 (날짜 및 평균 오류 수정) ---
         const recent20 = data.slice(-20)
-        const history = data.slice(-10).map(item => {
+        const history = data.slice(-10).map((item, index) => {
           // KST(한국 시간) 보정: 오전 9시 이전 데이터가 전날로 나오는 현상 해결
           const d = new Date(item.created_at)
+          const dateStr = `${d.getMonth() + 1}/${d.getDate()}`
           return {
-            date: `${d.getMonth() + 1}/${d.getDate()}`,
+            label: `${dateStr}(${index + 1})`,  // 고유 라벨 (중복 날짜 충돌 방지)
+            date: dateStr,
             score: item.score
           }
         })
@@ -107,20 +109,21 @@ export default function PublicReport() {
             </div>
 
             {/* 그래프 */}
-            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg overflow-visible">
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-green-400" /> 최근 성적 변화</h3>
-              <div className="h-48 w-full">
+              <div className="h-48 w-full overflow-visible">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.history} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     {/* 🔥 핵심: Y축을 숨기되, 0~100점으로 기준을 강력하게 고정! */}
                     <YAxis hide domain={[0, 100]} type="number" />
                     <Tooltip
+                      wrapperStyle={{ zIndex: 1000, overflow: 'visible' }}
                       cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           return (
-                            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl z-50">
+                            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl" style={{ zIndex: 1000 }}>
                               <p className="text-slate-400 text-xs mb-1">{payload[0].payload.date}</p>
                               <p className="text-white font-bold">{payload[0].value}점</p>
                             </div>
