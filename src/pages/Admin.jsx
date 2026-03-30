@@ -6,7 +6,7 @@ import {
   Upload, Trash2, LogOut, FileSpreadsheet, Users, Settings,
   BarChart2, XCircle, Plus, FolderPlus, Link as LinkIcon, RefreshCw, CheckSquare
 } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('word')
@@ -31,7 +31,7 @@ export default function Admin() {
     if (selectedGroup) {
       fetchGroupDetails()
       fetchStudents()
-      fetchWordStats() // 🔥 그룹 선택 시 단어 수 조회
+      fetchWordStats()
     } else {
       setStudents([])
       setWordStats({ total: 0, hasSynonyms: 0, hasAntonyms: 0 })
@@ -51,11 +51,9 @@ export default function Admin() {
     if (data) setStudents(data)
   }
 
-  // 🔥 [New] 단어 통계 조회 함수
   const fetchWordStats = async () => {
     const { data } = await supabase.from('words').select('synonyms, antonyms').eq('group_id', selectedGroup)
     if (data) {
-      // 전체 개수 및 유의어/반의어가 있는 단어 개수 계산
       const total = data.length
       const hasSynonyms = data.filter(w => w.synonyms && w.synonyms.length > 0).length
       const hasAntonyms = data.filter(w => w.antonyms && w.antonyms.length > 0).length
@@ -77,7 +75,6 @@ export default function Admin() {
       try {
         const wb = XLSX.read(evt.target.result, { type: 'binary' })
         const ws = wb.Sheets[wb.SheetNames[0]]
-        // 🔥 [Admin.jsx 수정 부분]
         const data = XLSX.utils.sheet_to_json(ws).map(r => ({
           word: r.word,
           meaning_ko: r.meaning_ko,
@@ -85,13 +82,13 @@ export default function Admin() {
           antonyms: r.antonyms ? String(r.antonyms).split(',').map(s => s.trim()) : [],
           group_id: parseInt(selectedGroup),
           difficulty: r.difficulty || 1,
-          pos: r.pos ? String(r.pos).trim() : null // ✨ [NEW] 엑셀에서 품사(pos) 읽어오기
+          pos: r.pos ? String(r.pos).trim() : null
         }))
 
         const { error } = await supabase.from('words').insert(data)
         if (error) throw error
         alert(`${data.length}개 등록 완료`)
-        fetchWordStats() // 업로드 직후 통계 갱신
+        fetchWordStats()
       } catch (err) {
         alert('실패:' + err.message)
       } finally {
@@ -106,7 +103,7 @@ export default function Admin() {
     if (!selectedGroup || !confirm('단어 전체 삭제?')) return
     await supabase.from('words').delete().eq('group_id', selectedGroup)
     alert('삭제 완료')
-    fetchWordStats() // 삭제 후 통계 갱신
+    fetchWordStats()
   }
 
   const updateGroupSettings = async () => {
@@ -122,7 +119,6 @@ export default function Admin() {
     setViewingStudent(null);
   }
 
-  // 🐛 [버그 수정] 통계 날짜 및 평균 점수 오류 수정
   const loadStudentReport = async (student) => {
     setViewingStudent(student);
     const { data } = await supabase.from('test_results').select('*').eq('user_id', student.id).order('created_at', { ascending: true });
@@ -133,7 +129,6 @@ export default function Admin() {
     }
 
     const chartData = data.slice(-10).map(i => {
-      // 한국 시간(KST) 보정 추가
       const d = new Date(i.created_at);
       return {
         date: `${d.getMonth() + 1}/${d.getDate()}`,
@@ -149,7 +144,6 @@ export default function Admin() {
       });
     });
 
-    // 평균 점수 NaN 방지 및 반올림 처리
     const avgScore = data.length > 0 ? Math.round(data.reduce((a, c) => a + c.score, 0) / data.length) : 0;
 
     setStudentStats({
@@ -303,10 +297,18 @@ export default function Admin() {
 
               {viewingStudent && (
                 <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 animate-fade-in border-l-4 border-l-indigo-500">
-                  <div className="flex justify-between items-start mb-6"><div><h2 className="text-xl font-bold text-white">{viewingStudent.name} 학생 리포트</h2><p className="text-slate-400 text-sm">평균: {studentStats?.avgScore}점 / 총: {studentStats?.totalTests}회</p></div><button onClick={() => setViewingStudent(null)} className="text-slate-500 hover:text-white"><XCircle /></button></div>
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">{viewingStudent.name} 학생 리포트</h2>
+                      <p className="text-slate-400 text-sm">평균: {studentStats?.avgScore}점 / 총: {studentStats?.totalTests}회</p>
+                    </div>
+                    <button onClick={() => setViewingStudent(null)} className="text-slate-500 hover:text-white"><XCircle /></button>
+                  </div>
+                  
                   {studentStats ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="h-40"><p className="text-sm text-slate-400 mb-2">성적 추이</p>
+                      <div className="h-48">
+                        <p className="text-sm text-slate-400 mb-2">성적 추이</p>
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={studentStats.chartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                             <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
@@ -325,19 +327,32 @@ export default function Admin() {
                                 return null;
                               }}
                             />
-                            {/* 🔥 수정된 부분: Admin.jsx 전용 파란색 단일 막대그래프 적용 */}
                             <Bar dataKey="score" fill="#818cf8" radius={[4, 4, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
-                        <div><p className="text-sm text-slate-400 mb-2">오답 노트</p><div className="space-y-2">{studentStats.frequentWrongs.map((w, i) => <div key={i} className="flex justify-between text-sm bg-slate-900 p-2 rounded border border-slate-700"><span className="text-white">{w.word}</span><span className="text-red-400">{w.count}회</span></div>)}</div></div>
                       </div>
-                      ) : <p className="text-center text-slate-500 py-10">기록 없음</p>}
+                      
+                      <div>
+                        <p className="text-sm text-slate-400 mb-2">오답 노트</p>
+                        <div className="space-y-2">
+                          {studentStats.frequentWrongs.map((w, i) => (
+                            <div key={i} className="flex justify-between text-sm bg-slate-900 p-2 rounded border border-slate-700">
+                              <span className="text-white">{w.word}</span>
+                              <span className="text-red-400">{w.count}회</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
+                  ) : (
+                    <p className="text-center text-slate-500 py-10">기록 없음</p>
                   )}
                 </div>
               )}
             </div>
+          )}
+        </div>
       </div>
-      </div>
-      )
+    </div>
+  )
 }
