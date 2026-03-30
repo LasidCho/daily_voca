@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { 
-  Play, CheckCircle, XCircle, LogOut, ArrowRight, 
-  Home as HomeIcon, BarChart2, TrendingUp, Share2 
+import {
+  Play, CheckCircle, XCircle, LogOut, ArrowRight,
+  Home as HomeIcon, BarChart2, TrendingUp, Share2
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 export default function Home() {
   const [user, setUser] = useState(null)
-  const [activeTab, setActiveTab] = useState('quiz') 
-  
+  const [activeTab, setActiveTab] = useState('quiz')
+
   // 퀴즈 State
   const [mode, setMode] = useState('menu')
   const [quizList, setQuizList] = useState([])
@@ -17,10 +17,10 @@ export default function Home() {
   const [score, setScore] = useState(0)
   const [wrongWords, setWrongWords] = useState([])
   const [feedback, setFeedback] = useState(null)
-  
+
   // 설정
   const [questionCount, setQuestionCount] = useState(10)
-  const [quizType, setQuizType] = useState('synonym') 
+  const [quizType, setQuizType] = useState('synonym')
 
   // 리포트 State
   const [stats, setStats] = useState({ totalTests: 0, avgScore: 0, history: [] })
@@ -75,7 +75,7 @@ export default function Home() {
 
   const startQuiz = async () => {
     if (!user?.group_id) return alert('오류: 그룹 정보가 없습니다.')
-    
+
     const groupInfo = await supabase.from('groups').select('question_count').eq('id', user.group_id).single()
     const limit = groupInfo.data?.question_count || 10
 
@@ -92,18 +92,18 @@ export default function Home() {
       const synList = getList(w.synonyms);
       const antList = getList(w.antonyms);
 
-      if (quizType === 'synonym') return synList.length >= 3; 
-      else if (quizType === 'antonym') return antList.length >= 3; 
+      if (quizType === 'synonym') return synList.length >= 3;
+      else if (quizType === 'antonym') return antList.length >= 3;
       return false;
     })
 
     if (validData.length < limit) {
       alert(`주의: 출제 조건을 만족하는 단어가 부족하여 ${validData.length}문제만 출제됩니다.\n(해당 유형의 동의어/반의어가 3개 이상인 단어만 출제됨)`)
-      if(validData.length === 0) return;
+      if (validData.length === 0) return;
     }
 
     const shuffled = validData.sort(() => 0.5 - Math.random()).slice(0, limit)
-    
+
     // 🔥 [New] 단어의 한국어 뜻을 찾아주는 헬퍼 함수
     const getMeaning = (wordText) => {
       const found = data.find(w => w.word.toLowerCase() === wordText.toLowerCase());
@@ -116,8 +116,8 @@ export default function Home() {
       const antList = getList(target.antonyms);
 
       let options = [];
-      let answer = ''; 
-      let relation = ''; 
+      let answer = '';
+      let relation = '';
 
       if (quizType === 'synonym') {
         const correctOptions = synList.sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -127,35 +127,35 @@ export default function Home() {
         } else {
           // 1. 겹치지 않는 랜덤 풀 생성
           let randomPool = data.filter(w => w.id !== target.id && !synList.includes(w.word));
-          
+
           // ✨ [NEW] 2. 대상 단어에 품사(pos)가 있다면, 같은 품사끼리 필터링 시도!
           if (target.pos) {
             const samePosPool = randomPool.filter(w => w.pos === target.pos);
             // 같은 품사를 가진 단어가 존재할 때만 랜덤 풀을 교체 (안전 장치)
-            if (samePosPool.length > 0) randomPool = samePosPool; 
+            if (samePosPool.length > 0) randomPool = samePosPool;
           }
-          
+
           answer = randomPool[Math.floor(Math.random() * randomPool.length)].word;
           relation = 'random';
         }
         options = [...correctOptions, answer];
-      } 
+      }
       else if (quizType === 'antonym') {
         const correctOptions = antList.sort(() => 0.5 - Math.random()).slice(0, 3);
         if (synList.length > 0) {
           answer = synList[Math.floor(Math.random() * synList.length)];
           relation = 'synonym';
         } else {
-           let randomPool = data.filter(w => w.id !== target.id && !antList.includes(w.word));
-           
-           // ✨ [NEW] 품사 필터링
-           if (target.pos) {
-              const samePosPool = randomPool.filter(w => w.pos === target.pos);
-              if (samePosPool.length > 0) randomPool = samePosPool;
-           }
+          let randomPool = data.filter(w => w.id !== target.id && !antList.includes(w.word));
 
-           answer = randomPool[Math.floor(Math.random() * randomPool.length)].word;
-           relation = 'random';
+          // ✨ [NEW] 품사 필터링
+          if (target.pos) {
+            const samePosPool = randomPool.filter(w => w.pos === target.pos);
+            if (samePosPool.length > 0) randomPool = samePosPool;
+          }
+
+          answer = randomPool[Math.floor(Math.random() * randomPool.length)].word;
+          relation = 'random';
         }
         options = [...correctOptions, answer];
       }
@@ -169,10 +169,10 @@ export default function Home() {
 
       return {
         ...target,
-        correctAnswerText: answer, 
-        correctAnswerMeaning: meaning, 
-        options: options.sort(() => 0.5 - Math.random()), 
-        question: target.word 
+        correctAnswerText: answer,
+        correctAnswerMeaning: meaning,
+        options: options.sort(() => 0.5 - Math.random()),
+        question: target.word
       }
     })
 
@@ -190,13 +190,13 @@ export default function Home() {
     const isCorrect = selectedOption === currentWord.correctAnswerText
     if (isCorrect) setScore(prev => prev + 1)
     else setWrongWords(prev => [...prev, { ...currentWord, yourAnswer: selectedOption, correctAnswer: currentWord.correctAnswerText }])
-    
+
     // 🔥 피드백에 정답과 그 뜻을 함께 저장
-    setFeedback({ 
-      isCorrect, 
-      selected: selectedOption, 
+    setFeedback({
+      isCorrect,
+      selected: selectedOption,
       correct: currentWord.correctAnswerText,
-      correctMeaning: currentWord.correctAnswerMeaning 
+      correctMeaning: currentWord.correctAnswerMeaning
     })
   }
 
@@ -206,7 +206,7 @@ export default function Home() {
       setCurrentIndex(prev => prev + 1)
     } else {
       setMode('result')
-      const finalScore = score 
+      const finalScore = score
       await supabase.from('test_results').insert({
         user_id: user.id,
         test_type: quizType,
@@ -273,7 +273,7 @@ export default function Home() {
                 </button>
               </div>
             )}
-            
+
             {mode === 'playing' && quizList[currentIndex] && (
               <div className="space-y-4 mt-4">
                 <div className="flex justify-between text-sm text-slate-400 font-mono">
@@ -293,18 +293,18 @@ export default function Home() {
                   </div>
                   {!feedback && <p className="text-slate-500 text-sm mt-4">?</p>}
                 </div>
-                
+
                 {feedback && (
                   <div className={`p-4 rounded-xl text-center border animate-fade-in ${feedback.isCorrect ? 'bg-green-500/20 border-green-500/50' : 'bg-red-500/20 border-red-500/50'}`}>
-                    {feedback.isCorrect ? <h3 className="text-green-400 font-bold flex justify-center gap-2"><CheckCircle /> 정답!</h3> : 
-                    <div>
-                      <h3 className="text-red-400 font-bold flex justify-center gap-2"><XCircle /> 땡!</h3>
-                      <p className="text-slate-300 mt-1">
-                        정답: <span className="text-green-400 font-bold underline">{feedback.correct}</span>
-                        {/* 🔥 뜻이 존재하면 단어 옆에 (뜻) 형태로 출력 */}
-                        {feedback.correctMeaning && <span className="text-green-300 text-sm ml-1">({feedback.correctMeaning})</span>}
-                      </p>
-                    </div>}
+                    {feedback.isCorrect ? <h3 className="text-green-400 font-bold flex justify-center gap-2"><CheckCircle /> 정답!</h3> :
+                      <div>
+                        <h3 className="text-red-400 font-bold flex justify-center gap-2"><XCircle /> 땡!</h3>
+                        <p className="text-slate-300 mt-1">
+                          정답: <span className="text-green-400 font-bold underline">{feedback.correct}</span>
+                          {/* 🔥 뜻이 존재하면 단어 옆에 (뜻) 형태로 출력 */}
+                          {feedback.correctMeaning && <span className="text-green-300 text-sm ml-1">({feedback.correctMeaning})</span>}
+                        </p>
+                      </div>}
                   </div>
                 )}
 
@@ -324,11 +324,11 @@ export default function Home() {
                     )
                   })}
                 </div>
-                
+
                 {feedback && <button onClick={handleNext} className="w-full py-4 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 animate-bounce-short">{currentIndex + 1 === quizList.length ? '결과 보기' : '다음 문제'} <ArrowRight size={20} /></button>}
               </div>
             )}
-            
+
             {mode === 'result' && (
               <div className="text-center space-y-6 mt-10 animate-fade-in">
                 <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700">
@@ -366,7 +366,20 @@ export default function Home() {
                     <BarChart data={stats.history}>
                       <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis hide domain={[0, 100]} />
-                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }} />
+                      <Tooltip
+                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl z-50">
+                                <p className="text-slate-400 text-xs mb-1">{payload[0].payload.date}</p>
+                                <p className="text-white font-bold">{payload[0].value}점</p>
+                              </div>
+                            )
+                          }
+                          return null;
+                        }}
+                      />
                       <Bar dataKey="score" radius={[4, 4, 0, 0]}>
                         {stats.history.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.score >= 80 ? '#4ade80' : entry.score >= 50 ? '#fbbf24' : '#f87171'} />)}
                       </Bar>
@@ -378,7 +391,7 @@ export default function Home() {
             <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
               <h3 className="text-lg font-bold mb-4 text-red-400">🔥 자주 틀리는 단어 Top 5 (최근 20회)</h3>
               {frequentWrongs.length > 0 ? (
-                <div className="space-y-3">{frequentWrongs.map((item, idx) => <div key={idx} className="flex justify-between items-center bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"><span className="text-white font-medium">{idx+1}. {item.word}</span><span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full">{item.count}회 오답</span></div>)}</div>
+                <div className="space-y-3">{frequentWrongs.map((item, idx) => <div key={idx} className="flex justify-between items-center bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"><span className="text-white font-medium">{idx + 1}. {item.word}</span><span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full">{item.count}회 오답</span></div>)}</div>
               ) : <p className="text-slate-500 text-sm">깨끗합니다! 👍</p>}
             </div>
           </div>

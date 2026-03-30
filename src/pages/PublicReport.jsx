@@ -78,17 +78,17 @@ export default function PublicReport() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-6 flex flex-col items-center">
       <div className="w-full max-w-md space-y-6 animate-fade-in">
-        
+
         {/* 헤더 */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-pink-400">
             Daily Voca 리포트
           </h1>
           <p className="text-slate-400 mt-2 flex items-center justify-center gap-2">
-            <User size={16}/> {studentName} 학생의 학습 기록
+            <User size={16} /> {studentName} 학생의 학습 기록
           </p>
           <p className="text-xs text-slate-500 mt-1">
-            <Calendar size={12} className="inline mr-1"/>
+            <Calendar size={12} className="inline mr-1" />
             {new Date().toLocaleDateString()} 기준
           </p>
         </div>
@@ -109,7 +109,7 @@ export default function PublicReport() {
 
             {/* 그래프 */}
             <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-green-400"/> 최근 성적 변화</h3>
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-green-400" /> 최근 성적 변화</h3>
               <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.history}>
@@ -119,8 +119,20 @@ export default function PublicReport() {
                         <Cell key={`cell-${index}`} fill={entry.score >= 80 ? '#4ade80' : entry.score >= 50 ? '#fbbf24' : '#f87171'} />
                       ))}
                     </Bar>
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }} />
-                  </BarChart>
+                    <Tooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl z-50">
+                              <p className="text-slate-400 text-xs mb-1">{payload[0].payload.date}</p>
+                              <p className="text-white font-bold">{payload[0].value}점</p>
+                            </div>
+                          )
+                        }
+                        return null;
+                      }}
+                    />                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -132,7 +144,7 @@ export default function PublicReport() {
                 <div className="space-y-3">
                   {stats.frequentWrongs.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                      <span className="text-white font-medium">{idx+1}. {item.word}</span>
+                      <span className="text-white font-medium">{idx + 1}. {item.word}</span>
                       <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full">{item.count}회 오답</span>
                     </div>
                   ))}
