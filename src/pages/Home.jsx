@@ -18,7 +18,7 @@ export default function Home() {
   const [wrongWords, setWrongWords] = useState([])
   const [feedback, setFeedback] = useState(null)
   
-  // 설정 (관리자가 정한 값으로 자동 세팅됨)
+  // 설정
   const [questionCount, setQuestionCount] = useState(10)
   const [quizType, setQuizType] = useState('synonym') 
 
@@ -43,20 +43,17 @@ export default function Home() {
     if (activeTab === 'report' && user) fetchStats()
   }, [activeTab])
 
-  // --- 리포트 로직 (날짜 & 평균 계산 수정됨) ---
   const fetchStats = async () => {
     const { data } = await supabase.from('test_results').select('*').eq('user_id', user.id).order('created_at', { ascending: true })
     if (!data || data.length === 0) {
-      // 데이터가 없을 때 NaN 에러 방지
       setStats({ totalTests: 0, avgScore: 0, history: [] })
       setFrequentWrongs([])
       return
     }
 
     const history = data.slice(-10).map(item => {
-      // 🐛 KST 시간대 보정 (UTC 기준이라 아침 9시 이전은 어제로 찍히는 현상 해결)
       const d = new Date(item.created_at)
-      d.setHours(d.getHours() + 9) // 9시간 더하기
+      d.setHours(d.getHours() + 9) 
       return { date: `${d.getMonth() + 1}/${d.getDate()}`, score: item.score }
     })
 
@@ -71,19 +68,12 @@ export default function Home() {
       }
     })
     const sortedWrongs = Object.entries(wrongMap).sort(([, a], [, b]) => b - a).slice(0, 5).map(([word, count]) => ({ word, count }))
-
-    // 🐛 평균 점수 소수점 에러 방지 (Math.round 적용)
     const average = data.length > 0 ? Math.round(data.reduce((acc, curr) => acc + curr.score, 0) / data.length) : 0;
 
-    setStats({
-      totalTests: data.length,
-      avgScore: average,
-      history
-    })
+    setStats({ totalTests: data.length, avgScore: average, history })
     setFrequentWrongs(sortedWrongs)
   }
 
-// --- 퀴즈 로직 (새로운 출제 방식 적용 및 에러 방지) ---
   const startQuiz = async () => {
     if (!user?.group_id) return alert('오류: 그룹 정보가 없습니다.')
     
@@ -93,33 +83,34 @@ export default function Home() {
     const { data, error } = await supabase.from('words').select('*').eq('group_id', user.group_id)
     if (error || !data || data.length < 4) return alert('단어가 부족합니다 (최소 4개).')
 
-    // 🔥 [버그 수정] 데이터베이스에서 유의어/반의어가 '배열'로 오든 '글자'로 오든 에러 없이 리스트로 변환해주는 안전 장치
     const getList = (item) => {
       if (!item) return [];
       if (Array.isArray(item)) return item.map(s => String(s).trim()).filter(Boolean);
       return String(item).split(',').map(s => s.trim()).filter(Boolean);
     };
 
-    // 1. 출제 가능한 단어만 엄격하게 필터링
     const validData = data.filter(w => {
       const synList = getList(w.synonyms);
       const antList = getList(w.antonyms);
 
-      if (quizType === 'synonym') {
-        return synList.length >= 3; 
-      } else if (quizType === 'antonym') {
-        return antList.length >= 3; 
-      }
+      if (quizType === 'synonym') return synList.length >= 3; 
+      else if (quizType === 'antonym') return antList.length >= 3; 
       return false;
-    });
+    })
 
     if (validData.length < limit) {
-      alert(`주의: 출제 조건을 만족하는 단어가 부족하여 ${validData.length}문제만 출제됩니다.\n(해당 유형의 동의어/반의어가 3개 이상인 단어만 출제됨)`);
+      alert(`주의: 출제 조건을 만족하는 단어가 부족하여 ${validData.length}문제만 출제됩니다.\n(해당 유형의 동의어/반의어가 3개 이상인 단어만 출제됨)`)
       if(validData.length === 0) return;
     }
 
-    const shuffled = validData.sort(() => 0.5 - Math.random()).slice(0, limit);
+    const shuffled = validData.sort(() => 0.5 - Math.random()).slice(0, limit)
     
+    // 🔥 [New] 단어의 한국어 뜻을 찾아주는 헬퍼 함수
+    const getMeaning = (wordText) => {
+      const found = data.find(w => w.word.toLowerCase() === wordText.toLowerCase());
+      return found ? found.meaning_ko : '';
+    }
+
     const newQuiz = shuffled.map(target => {
       const synList = getList(target.synonyms);
       const antList = getList(target.antonyms);
@@ -128,10 +119,7 @@ export default function Home() {
       let answer = ''; 
 
       if (quizType === 'synonym') {
-        // [선지 3개] 유의어 중 3개 랜덤 추출
         const correctOptions = synList.sort(() => 0.5 - Math.random()).slice(0, 3);
-        
-        // [정답 1개] 반의어 1개 (없으면 랜덤 단어)
         if (antList.length > 0) {
           answer = antList[Math.floor(Math.random() * antList.length)];
         } else {
@@ -141,10 +129,7 @@ export default function Home() {
         options = [...correctOptions, answer];
       } 
       else if (quizType === 'antonym') {
-        // [선지 3개] 반의어 중 3개 랜덤 추출
         const correctOptions = antList.sort(() => 0.5 - Math.random()).slice(0, 3);
-        
-        // [정답 1개] 유의어 1개 (없으면 랜덤 단어)
         if (synList.length > 0) {
           answer = synList[Math.floor(Math.random() * synList.length)];
         } else {
@@ -157,17 +142,18 @@ export default function Home() {
       return {
         ...target,
         correctAnswerText: answer, 
+        correctAnswerMeaning: getMeaning(answer), // 🔥 정답 단어의 뜻 저장
         options: options.sort(() => 0.5 - Math.random()), 
         question: target.word 
       }
-    });
+    })
 
-    setQuizList(newQuiz);
-    setCurrentIndex(0);
-    setScore(0);
-    setWrongWords([]);
-    setFeedback(null);
-    setMode('playing');
+    setQuizList(newQuiz)
+    setCurrentIndex(0)
+    setScore(0)
+    setWrongWords([])
+    setFeedback(null)
+    setMode('playing')
   }
 
   const handleAnswer = (selectedOption) => {
@@ -176,7 +162,14 @@ export default function Home() {
     const isCorrect = selectedOption === currentWord.correctAnswerText
     if (isCorrect) setScore(prev => prev + 1)
     else setWrongWords(prev => [...prev, { ...currentWord, yourAnswer: selectedOption, correctAnswer: currentWord.correctAnswerText }])
-    setFeedback({ isCorrect, selected: selectedOption, correct: currentWord.correctAnswerText })
+    
+    // 🔥 피드백에 정답과 그 뜻을 함께 저장
+    setFeedback({ 
+      isCorrect, 
+      selected: selectedOption, 
+      correct: currentWord.correctAnswerText,
+      correctMeaning: currentWord.correctAnswerMeaning 
+    })
   }
 
   const handleNext = async () => {
@@ -185,7 +178,7 @@ export default function Home() {
       setCurrentIndex(prev => prev + 1)
     } else {
       setMode('result')
-      const finalScore = score;
+      const finalScore = score 
       await supabase.from('test_results').insert({
         user_id: user.id,
         test_type: quizType,
@@ -225,7 +218,6 @@ export default function Home() {
           <>
             {mode === 'menu' && (
               <div className="space-y-6 animate-fade-in mt-4">
-                {/* 🔥 [Updated] 제목 크기 확대 & 서명 영역 */}
                 <div className="text-center mb-8">
                   <h1 className="text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-pink-400">
                     Daily Voca
@@ -264,7 +256,9 @@ export default function Home() {
                   <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${((currentIndex + 1) / quizList.length) * 100}%` }}></div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-md p-8 rounded-3xl border border-white/10 text-center shadow-2xl relative">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 uppercase ${quizType === 'synonym' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-pink-500/20 text-pink-300'}`}>Find the odd one out</span>
+                  <span className={`inline-block px-4 py-2 rounded-full text-sm font-bold mb-4 shadow-sm ${quizType === 'synonym' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-pink-500/20 text-pink-300'}`}>
+                    {quizType === 'synonym' ? '💡 다음 중 유의어에 해당하지 않는 것을 고르시오' : '💡 다음 중 반의어에 해당하지 않는 것을 고르시오'}
+                  </span>
                   <h2 className="text-4xl font-black text-white mb-2">{quizList[currentIndex].word}</h2>
                   <div className={`transition-all duration-500 overflow-hidden ${feedback ? 'max-h-20 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
                     <p className="text-xl text-yellow-300 font-bold">"{quizList[currentIndex].meaning_ko}"</p>
@@ -275,7 +269,14 @@ export default function Home() {
                 {feedback && (
                   <div className={`p-4 rounded-xl text-center border animate-fade-in ${feedback.isCorrect ? 'bg-green-500/20 border-green-500/50' : 'bg-red-500/20 border-red-500/50'}`}>
                     {feedback.isCorrect ? <h3 className="text-green-400 font-bold flex justify-center gap-2"><CheckCircle /> 정답!</h3> : 
-                    <div><h3 className="text-red-400 font-bold flex justify-center gap-2"><XCircle /> 땡!</h3><p className="text-slate-300 mt-1">정답: <span className="text-green-400 font-bold underline">{feedback.correct}</span></p></div>}
+                    <div>
+                      <h3 className="text-red-400 font-bold flex justify-center gap-2"><XCircle /> 땡!</h3>
+                      <p className="text-slate-300 mt-1">
+                        정답: <span className="text-green-400 font-bold underline">{feedback.correct}</span>
+                        {/* 🔥 뜻이 존재하면 단어 옆에 (뜻) 형태로 출력 */}
+                        {feedback.correctMeaning && <span className="text-green-300 text-sm ml-1">({feedback.correctMeaning})</span>}
+                      </p>
+                    </div>}
                   </div>
                 )}
 
