@@ -6,7 +6,7 @@ import {
   Upload, Trash2, LogOut, FileSpreadsheet, Users, Settings,
   BarChart2, XCircle, Plus, FolderPlus, Link as LinkIcon, RefreshCw, CheckSquare
 } from 'lucide-react'
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('word')

@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { BarChart2, TrendingUp, User, Calendar } from 'lucide-react'
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 export default function PublicReport() {
   const { userId } = useParams() // URL에서 학생 ID를 가져옴
   const [stats, setStats] = useState(null)
