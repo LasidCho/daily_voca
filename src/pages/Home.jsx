@@ -53,7 +53,6 @@ export default function Home() {
 
     const history = data.slice(-10).map(item => {
       const d = new Date(item.created_at)
-      d.setHours(d.getHours() + 9) 
       return { date: `${d.getMonth() + 1}/${d.getDate()}`, score: item.score }
     })
 

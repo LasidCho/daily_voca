@@ -35,7 +35,6 @@ export default function PublicReport() {
         const history = data.slice(-10).map(item => {
           // KST(한국 시간) 보정: 오전 9시 이전 데이터가 전날로 나오는 현상 해결
           const d = new Date(item.created_at)
-          d.setHours(d.getHours() + 9) 
           return {
             date: `${d.getMonth() + 1}/${d.getDate()}`,
             score: item.score

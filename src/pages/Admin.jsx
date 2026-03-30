@@ -135,7 +135,6 @@ export default function Admin() {
     const chartData = data.slice(-10).map(i => {
       // 한국 시간(KST) 보정 추가
       const d = new Date(i.created_at);
-      d.setHours(d.getHours() + 9);
       return {
         date: `${d.getMonth() + 1}/${d.getDate()}`,
         score: i.score
