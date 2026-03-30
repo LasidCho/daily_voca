@@ -30,12 +30,17 @@ export default function PublicReport() {
       if (!data || data.length === 0) {
         setStats(null)
       } else {
-        // 통계 계산
+        // --- 🐛 통계 계산 (날짜 및 평균 오류 수정) ---
         const recent20 = data.slice(-20)
-        const history = data.slice(-10).map(item => ({
-          date: new Date(item.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
-          score: item.score
-        }))
+        const history = data.slice(-10).map(item => {
+          // KST(한국 시간) 보정: 오전 9시 이전 데이터가 전날로 나오는 현상 해결
+          const d = new Date(item.created_at)
+          d.setHours(d.getHours() + 9) 
+          return {
+            date: `${d.getMonth() + 1}/${d.getDate()}`,
+            score: item.score
+          }
+        })
 
         // 오답 분석
         const wrongMap = {}
@@ -52,9 +57,12 @@ export default function PublicReport() {
           .slice(0, 5)
           .map(([word, count]) => ({ word, count }))
 
+        // 평균 점수 계산 시 NaN 에러 방지용 방어 코드 추가
+        const average = data.length > 0 ? Math.round(data.reduce((acc, curr) => acc + curr.score, 0) / data.length) : 0;
+
         setStats({
           totalTests: data.length,
-          avgScore: Math.round(data.reduce((acc, curr) => acc + curr.score, 0) / data.length),
+          avgScore: average,
           history,
           frequentWrongs
         })

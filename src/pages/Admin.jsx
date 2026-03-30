@@ -80,7 +80,6 @@ export default function Admin() {
         const data = XLSX.utils.sheet_to_json(ws).map(r => ({
           word: r.word, 
           meaning_ko: r.meaning_ko, 
-          // 콤마로 구분하거나, 혹시 모를 에러 방지용 안전장치 추가
           synonyms: r.synonyms ? String(r.synonyms).split(',').map(s=>s.trim()) : [], 
           antonyms: r.antonyms ? String(r.antonyms).split(',').map(s=>s.trim()) : [], 
           group_id: parseInt(selectedGroup), 
@@ -112,23 +111,75 @@ export default function Admin() {
     const {error} = await supabase.from('groups').update({question_count: groupSettings}).eq('id', selectedGroup)
     if(!error) alert('저장됨')
   }
+  
   const handleDeleteStudent = async (id) => {
-    if(!confirm('학생 삭제?')) return; await supabase.from('users').delete().eq('id', id); alert('삭제됨'); fetchStudents(); setViewingStudent(null);
+    if(!confirm('학생 삭제?')) return; 
+    await supabase.from('users').delete().eq('id', id); 
+    alert('삭제됨'); 
+    fetchStudents(); 
+    setViewingStudent(null);
   }
+
+  // 🐛 [버그 수정] 통계 날짜 및 평균 점수 오류 수정
   const loadStudentReport = async (student) => {
-    setViewingStudent(student); const {data} = await supabase.from('test_results').select('*').eq('user_id', student.id).order('created_at', {ascending:true});
-    if(!data || data.length===0) { setStudentStats(null); return }
-    const chartData = data.slice(-10).map(i => ({date: new Date(i.created_at).toLocaleDateString('ko-KR', {month:'numeric', day:'numeric'}), score: i.score}));
-    const wm = {}; data.slice(-20).forEach(t => t.wrong_words?.forEach(w => wm[`${w.word} (${w.meaning_ko})`] = (wm[`${w.word} (${w.meaning_ko})`]||0)+1));
-    setStudentStats({avgScore: Math.round(data.reduce((a,c)=>a+c.score,0)/data.length), totalTests: data.length, chartData, frequentWrongs: Object.entries(wm).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([word,count])=>({word,count}))});
+    setViewingStudent(student); 
+    const {data} = await supabase.from('test_results').select('*').eq('user_id', student.id).order('created_at', {ascending:true});
+    
+    if(!data || data.length === 0) { 
+      setStudentStats(null); 
+      return 
+    }
+    
+    const chartData = data.slice(-10).map(i => {
+      // 한국 시간(KST) 보정 추가
+      const d = new Date(i.created_at);
+      d.setHours(d.getHours() + 9);
+      return {
+        date: `${d.getMonth() + 1}/${d.getDate()}`,
+        score: i.score
+      };
+    });
+
+    const wm = {}; 
+    data.slice(-20).forEach(t => {
+      t.wrong_words?.forEach(w => {
+        const key = `${w.word} (${w.meaning_ko})`;
+        wm[key] = (wm[key] || 0) + 1;
+      });
+    });
+    
+    // 평균 점수 NaN 방지 및 반올림 처리
+    const avgScore = data.length > 0 ? Math.round(data.reduce((a,c)=>a+c.score,0)/data.length) : 0;
+
+    setStudentStats({
+      avgScore, 
+      totalTests: data.length, 
+      chartData, 
+      frequentWrongs: Object.entries(wm).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([word,count])=>({word,count}))
+    });
   }
+
   const handleAddGroup = async () => {
-    if(!newGroupName.trim()) return; await supabase.from('groups').insert({name:newGroupName}); alert('생성됨'); setNewGroupName(''); fetchGroups();
+    if(!newGroupName.trim()) return; 
+    await supabase.from('groups').insert({name:newGroupName}); 
+    alert('생성됨'); 
+    setNewGroupName(''); 
+    fetchGroups();
   }
+
   const handleDeleteGroup = async () => {
-    if(!selectedGroup) return; const u = await supabase.from('users').select('id').eq('group_id', selectedGroup); if(u.data?.length>0) return alert('학생 존재시 삭제 불가');
-    if(confirm('그룹 삭제?')) { await supabase.from('groups').delete().eq('id', selectedGroup); alert('삭제됨'); setSelectedGroup(''); fetchGroups(); }
+    if(!selectedGroup) return; 
+    const u = await supabase.from('users').select('id').eq('group_id', selectedGroup); 
+    if(u.data?.length > 0) return alert('학생 존재시 삭제 불가');
+    
+    if(confirm('그룹 삭제?')) { 
+      await supabase.from('groups').delete().eq('id', selectedGroup); 
+      alert('삭제됨'); 
+      setSelectedGroup(''); 
+      fetchGroups(); 
+    }
   }
+
   const handleResetGroupRecords = async () => {
     if (!selectedGroup) return alert('그룹을 선택해주세요.')
     const confirmMsg = prompt(`⚠️ 경고: 이 그룹(${groups.find(g=>g.id==selectedGroup)?.name}) 학생들의 모든 시험 기록이 영구 삭제됩니다.\n진행하려면 "초기화" 라고 입력하세요.`)
@@ -143,9 +194,11 @@ export default function Admin() {
       if (viewingStudent && studentIds.includes(viewingStudent.id)) setViewingStudent(null)
     } catch (err) { alert('실패: ' + err.message) }
   }
+
   const handleCopyLink = (student) => {
     const link = `${window.location.origin}/report/${student.id}`
-    navigator.clipboard.writeText(link); alert('링크 복사 완료');
+    navigator.clipboard.writeText(link); 
+    alert('링크 복사 완료');
   }
 
   return (
@@ -169,7 +222,6 @@ export default function Admin() {
             </select>
           </div>
           
-          {/* 🔥 [New] 단어 수 확인 패널 (Word 탭일 때 보임) */}
           {activeTab === 'word' && selectedGroup && (
             <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 animate-fade-in">
               <h3 className="text-lg font-bold mb-4 text-indigo-300 flex items-center gap-2"><CheckSquare size={18}/> 등록 현황</h3>

@@ -43,13 +43,20 @@ export default function Home() {
     if (activeTab === 'report' && user) fetchStats()
   }, [activeTab])
 
-  // --- 리포트 로직 ---
+  // --- 리포트 로직 (날짜 & 평균 계산 수정됨) ---
   const fetchStats = async () => {
     const { data } = await supabase.from('test_results').select('*').eq('user_id', user.id).order('created_at', { ascending: true })
-    if (!data || data.length === 0) return
+    if (!data || data.length === 0) {
+      // 데이터가 없을 때 NaN 에러 방지
+      setStats({ totalTests: 0, avgScore: 0, history: [] })
+      setFrequentWrongs([])
+      return
+    }
 
     const history = data.slice(-10).map(item => {
+      // 🐛 KST 시간대 보정 (UTC 기준이라 아침 9시 이전은 어제로 찍히는 현상 해결)
       const d = new Date(item.created_at)
+      d.setHours(d.getHours() + 9) // 9시간 더하기
       return { date: `${d.getMonth() + 1}/${d.getDate()}`, score: item.score }
     })
 
@@ -65,15 +72,18 @@ export default function Home() {
     })
     const sortedWrongs = Object.entries(wrongMap).sort(([, a], [, b]) => b - a).slice(0, 5).map(([word, count]) => ({ word, count }))
 
+    // 🐛 평균 점수 소수점 에러 방지 (Math.round 적용)
+    const average = data.length > 0 ? Math.round(data.reduce((acc, curr) => acc + curr.score, 0) / data.length) : 0;
+
     setStats({
       totalTests: data.length,
-      avgScore: Math.round(data.reduce((acc, curr) => acc + curr.score, 0) / data.length),
+      avgScore: average,
       history
     })
     setFrequentWrongs(sortedWrongs)
   }
 
-  // --- 퀴즈 로직 ---
+  // --- 퀴즈 로직 (새로운 출제 방식 적용) ---
   const startQuiz = async () => {
     if (!user?.group_id) return alert('오류: 그룹 정보가 없습니다.')
     
@@ -83,32 +93,67 @@ export default function Home() {
     const { data, error } = await supabase.from('words').select('*').eq('group_id', user.group_id)
     if (error || !data || data.length < 4) return alert('단어가 부족합니다 (최소 4개).')
 
+    // 1. 출제 가능한 단어만 엄격하게 필터링
     const validData = data.filter(w => {
-      if (quizType === 'synonym') return w.synonyms?.length > 0
-      if (quizType === 'antonym') return w.antonyms?.length > 0
-      return false
+      const synList = w.synonyms ? w.synonyms.split(',').map(s => s.trim()).filter(s => s) : [];
+      const antList = w.antonyms ? w.antonyms.split(',').map(s => s.trim()).filter(s => s) : [];
+
+      if (quizType === 'synonym') {
+        // 유의어 문제: 선지 3개를 유의어로 채워야 하므로, 최소 3개 이상 등록된 단어만 출제
+        return synList.length >= 3; 
+      } else if (quizType === 'antonym') {
+        // 반의어 문제: 선지 3개를 반의어로 채워야 함
+        return antList.length >= 3; 
+      }
+      return false;
     })
-    if (validData.length < 4) return alert('유의어/반의어 데이터가 부족합니다.')
+
+    if (validData.length < limit) {
+      alert(`주의: 출제 조건을 만족하는 단어가 부족하여 ${validData.length}문제만 출제됩니다.\n(해당 유형의 동의어/반의어가 3개 이상인 단어만 출제됨)`)
+      if(validData.length === 0) return;
+    }
 
     const shuffled = validData.sort(() => 0.5 - Math.random()).slice(0, limit)
     
     const newQuiz = shuffled.map(target => {
-      const correctCandidates = quizType === 'synonym' ? target.synonyms : target.antonyms
-      const correctAnswer = correctCandidates[Math.floor(Math.random() * correctCandidates.length)]
+      const synList = target.synonyms ? target.synonyms.split(',').map(s => s.trim()).filter(s => s) : [];
+      const antList = target.antonyms ? target.antonyms.split(',').map(s => s.trim()).filter(s => s) : [];
 
-      const distractors = validData
-        .filter(w => w.id !== target.id)
-        .map(w => {
-          const arr = quizType === 'synonym' ? w.synonyms : w.antonyms
-          if (!arr || arr.length === 0) return null
-          return arr[Math.floor(Math.random() * arr.length)]
-        })
-        .filter(val => val).sort(() => 0.5 - Math.random()).slice(0, 3)
+      let options = [];
+      let answer = ''; // 학생들이 골라야 할 "틀린" 정답
+
+      if (quizType === 'synonym') {
+        // [선지 3개] 유의어 중 3개 랜덤 추출
+        const correctOptions = synList.sort(() => 0.5 - Math.random()).slice(0, 3);
+        
+        // [정답 1개] 반의어 1개 (없으면 랜덤 단어)
+        if (antList.length > 0) {
+          answer = antList[Math.floor(Math.random() * antList.length)];
+        } else {
+          // 겹치지 않는 완전 랜덤 단어 1개
+          const randomWords = data.filter(w => w.id !== target.id && !synList.includes(w.word));
+          answer = randomWords[Math.floor(Math.random() * randomWords.length)].word;
+        }
+        options = [...correctOptions, answer];
+      } 
+      else if (quizType === 'antonym') {
+        // [선지 3개] 반의어 중 3개 랜덤 추출
+        const correctOptions = antList.sort(() => 0.5 - Math.random()).slice(0, 3);
+        
+        // [정답 1개] 유의어 1개 (없으면 랜덤 단어)
+        if (synList.length > 0) {
+          answer = synList[Math.floor(Math.random() * synList.length)];
+        } else {
+           const randomWords = data.filter(w => w.id !== target.id && !antList.includes(w.word));
+           answer = randomWords[Math.floor(Math.random() * randomWords.length)].word;
+        }
+        options = [...correctOptions, answer];
+      }
 
       return {
         ...target,
-        correctAnswerText: correctAnswer,
-        options: [...distractors, correctAnswer].sort(() => 0.5 - Math.random()),
+        correctAnswerText: answer, // 학생들이 클릭해야 정답 처리됨
+        options: options.sort(() => 0.5 - Math.random()), // 4지 선다 위치 랜덤 섞기
         question: target.word 
       }
     })
@@ -176,7 +221,7 @@ export default function Home() {
           <>
             {mode === 'menu' && (
               <div className="space-y-6 animate-fade-in mt-4">
-                {/* 🔥 [Updated] 제목 크기 확대 & 서명 이탤릭 제거 */}
+                {/* 🔥 [Updated] 제목 크기 확대 & 서명 영역 */}
                 <div className="text-center mb-8">
                   <h1 className="text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-pink-400">
                     Daily Voca
@@ -215,19 +260,21 @@ export default function Home() {
                   <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${((currentIndex + 1) / quizList.length) * 100}%` }}></div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-md p-8 rounded-3xl border border-white/10 text-center shadow-2xl relative">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 uppercase ${quizType === 'synonym' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-pink-500/20 text-pink-300'}`}>Find the {quizType}</span>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 uppercase ${quizType === 'synonym' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-pink-500/20 text-pink-300'}`}>Find the odd one out</span>
                   <h2 className="text-4xl font-black text-white mb-2">{quizList[currentIndex].word}</h2>
                   <div className={`transition-all duration-500 overflow-hidden ${feedback ? 'max-h-20 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
                     <p className="text-xl text-yellow-300 font-bold">"{quizList[currentIndex].meaning_ko}"</p>
                   </div>
                   {!feedback && <p className="text-slate-500 text-sm mt-4">?</p>}
                 </div>
+                
                 {feedback && (
                   <div className={`p-4 rounded-xl text-center border animate-fade-in ${feedback.isCorrect ? 'bg-green-500/20 border-green-500/50' : 'bg-red-500/20 border-red-500/50'}`}>
                     {feedback.isCorrect ? <h3 className="text-green-400 font-bold flex justify-center gap-2"><CheckCircle /> 정답!</h3> : 
                     <div><h3 className="text-red-400 font-bold flex justify-center gap-2"><XCircle /> 땡!</h3><p className="text-slate-300 mt-1">정답: <span className="text-green-400 font-bold underline">{feedback.correct}</span></p></div>}
                   </div>
                 )}
+
                 <div className="grid gap-3">
                   {quizList[currentIndex].options.map((option, idx) => {
                     let btnClass = "bg-slate-800 border-slate-700 hover:bg-slate-700"
@@ -244,6 +291,7 @@ export default function Home() {
                     )
                   })}
                 </div>
+                
                 {feedback && <button onClick={handleNext} className="w-full py-4 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 animate-bounce-short">{currentIndex + 1 === quizList.length ? '결과 보기' : '다음 문제'} <ArrowRight size={20} /></button>}
               </div>
             )}
@@ -263,6 +311,7 @@ export default function Home() {
           </>
         )}
 
+        {/* --- 아래 리포트 영역 --- */}
         {activeTab === 'report' && (
           <div className="space-y-6 animate-fade-in mt-4">
             <div className="flex justify-between items-center">
