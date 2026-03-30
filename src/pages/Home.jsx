@@ -83,7 +83,7 @@ export default function Home() {
     setFrequentWrongs(sortedWrongs)
   }
 
-  // --- 퀴즈 로직 (새로운 출제 방식 적용) ---
+// --- 퀴즈 로직 (새로운 출제 방식 적용 및 에러 방지) ---
   const startQuiz = async () => {
     if (!user?.group_id) return alert('오류: 그룹 정보가 없습니다.')
     
@@ -93,34 +93,39 @@ export default function Home() {
     const { data, error } = await supabase.from('words').select('*').eq('group_id', user.group_id)
     if (error || !data || data.length < 4) return alert('단어가 부족합니다 (최소 4개).')
 
+    // 🔥 [버그 수정] 데이터베이스에서 유의어/반의어가 '배열'로 오든 '글자'로 오든 에러 없이 리스트로 변환해주는 안전 장치
+    const getList = (item) => {
+      if (!item) return [];
+      if (Array.isArray(item)) return item.map(s => String(s).trim()).filter(Boolean);
+      return String(item).split(',').map(s => s.trim()).filter(Boolean);
+    };
+
     // 1. 출제 가능한 단어만 엄격하게 필터링
     const validData = data.filter(w => {
-      const synList = w.synonyms ? w.synonyms.split(',').map(s => s.trim()).filter(s => s) : [];
-      const antList = w.antonyms ? w.antonyms.split(',').map(s => s.trim()).filter(s => s) : [];
+      const synList = getList(w.synonyms);
+      const antList = getList(w.antonyms);
 
       if (quizType === 'synonym') {
-        // 유의어 문제: 선지 3개를 유의어로 채워야 하므로, 최소 3개 이상 등록된 단어만 출제
         return synList.length >= 3; 
       } else if (quizType === 'antonym') {
-        // 반의어 문제: 선지 3개를 반의어로 채워야 함
         return antList.length >= 3; 
       }
       return false;
-    })
+    });
 
     if (validData.length < limit) {
-      alert(`주의: 출제 조건을 만족하는 단어가 부족하여 ${validData.length}문제만 출제됩니다.\n(해당 유형의 동의어/반의어가 3개 이상인 단어만 출제됨)`)
+      alert(`주의: 출제 조건을 만족하는 단어가 부족하여 ${validData.length}문제만 출제됩니다.\n(해당 유형의 동의어/반의어가 3개 이상인 단어만 출제됨)`);
       if(validData.length === 0) return;
     }
 
-    const shuffled = validData.sort(() => 0.5 - Math.random()).slice(0, limit)
+    const shuffled = validData.sort(() => 0.5 - Math.random()).slice(0, limit);
     
     const newQuiz = shuffled.map(target => {
-      const synList = target.synonyms ? target.synonyms.split(',').map(s => s.trim()).filter(s => s) : [];
-      const antList = target.antonyms ? target.antonyms.split(',').map(s => s.trim()).filter(s => s) : [];
+      const synList = getList(target.synonyms);
+      const antList = getList(target.antonyms);
 
       let options = [];
-      let answer = ''; // 학생들이 골라야 할 "틀린" 정답
+      let answer = ''; 
 
       if (quizType === 'synonym') {
         // [선지 3개] 유의어 중 3개 랜덤 추출
@@ -130,7 +135,6 @@ export default function Home() {
         if (antList.length > 0) {
           answer = antList[Math.floor(Math.random() * antList.length)];
         } else {
-          // 겹치지 않는 완전 랜덤 단어 1개
           const randomWords = data.filter(w => w.id !== target.id && !synList.includes(w.word));
           answer = randomWords[Math.floor(Math.random() * randomWords.length)].word;
         }
@@ -152,18 +156,18 @@ export default function Home() {
 
       return {
         ...target,
-        correctAnswerText: answer, // 학생들이 클릭해야 정답 처리됨
-        options: options.sort(() => 0.5 - Math.random()), // 4지 선다 위치 랜덤 섞기
+        correctAnswerText: answer, 
+        options: options.sort(() => 0.5 - Math.random()), 
         question: target.word 
       }
-    })
+    });
 
-    setQuizList(newQuiz)
-    setCurrentIndex(0)
-    setScore(0)
-    setWrongWords([])
-    setFeedback(null)
-    setMode('playing')
+    setQuizList(newQuiz);
+    setCurrentIndex(0);
+    setScore(0);
+    setWrongWords([]);
+    setFeedback(null);
+    setMode('playing');
   }
 
   const handleAnswer = (selectedOption) => {
@@ -181,7 +185,7 @@ export default function Home() {
       setCurrentIndex(prev => prev + 1)
     } else {
       setMode('result')
-      const finalScore = score + (feedback.isCorrect ? 1 : 0)
+      const finalScore = score;
       await supabase.from('test_results').insert({
         user_id: user.id,
         test_type: quizType,
