@@ -111,20 +111,33 @@ export default function Home() {
       return found ? found.meaning_ko : '';
     }
 
+    // 🔥 [Home.jsx 수정 부분]
     const newQuiz = shuffled.map(target => {
       const synList = getList(target.synonyms);
       const antList = getList(target.antonyms);
 
       let options = [];
       let answer = ''; 
+      let relation = ''; 
 
       if (quizType === 'synonym') {
         const correctOptions = synList.sort(() => 0.5 - Math.random()).slice(0, 3);
         if (antList.length > 0) {
           answer = antList[Math.floor(Math.random() * antList.length)];
+          relation = 'antonym';
         } else {
-          const randomWords = data.filter(w => w.id !== target.id && !synList.includes(w.word));
-          answer = randomWords[Math.floor(Math.random() * randomWords.length)].word;
+          // 1. 겹치지 않는 랜덤 풀 생성
+          let randomPool = data.filter(w => w.id !== target.id && !synList.includes(w.word));
+          
+          // ✨ [NEW] 2. 대상 단어에 품사(pos)가 있다면, 같은 품사끼리 필터링 시도!
+          if (target.pos) {
+            const samePosPool = randomPool.filter(w => w.pos === target.pos);
+            // 같은 품사를 가진 단어가 존재할 때만 랜덤 풀을 교체 (안전 장치)
+            if (samePosPool.length > 0) randomPool = samePosPool; 
+          }
+          
+          answer = randomPool[Math.floor(Math.random() * randomPool.length)].word;
+          relation = 'random';
         }
         options = [...correctOptions, answer];
       } 
@@ -132,17 +145,33 @@ export default function Home() {
         const correctOptions = antList.sort(() => 0.5 - Math.random()).slice(0, 3);
         if (synList.length > 0) {
           answer = synList[Math.floor(Math.random() * synList.length)];
+          relation = 'synonym';
         } else {
-           const randomWords = data.filter(w => w.id !== target.id && !antList.includes(w.word));
-           answer = randomWords[Math.floor(Math.random() * randomWords.length)].word;
+           let randomPool = data.filter(w => w.id !== target.id && !antList.includes(w.word));
+           
+           // ✨ [NEW] 품사 필터링
+           if (target.pos) {
+              const samePosPool = randomPool.filter(w => w.pos === target.pos);
+              if (samePosPool.length > 0) randomPool = samePosPool;
+           }
+
+           answer = randomPool[Math.floor(Math.random() * randomPool.length)].word;
+           relation = 'random';
         }
         options = [...correctOptions, answer];
+      }
+
+      let meaning = getMeaning(answer);
+      if (!meaning) {
+        if (relation === 'antonym') meaning = `제시어 '${target.word}'의 반의어`;
+        else if (relation === 'synonym') meaning = `제시어 '${target.word}'의 유의어`;
+        else meaning = `제시어와 무관한 단어`;
       }
 
       return {
         ...target,
         correctAnswerText: answer, 
-        correctAnswerMeaning: getMeaning(answer), // 🔥 정답 단어의 뜻 저장
+        correctAnswerMeaning: meaning, 
         options: options.sort(() => 0.5 - Math.random()), 
         question: target.word 
       }

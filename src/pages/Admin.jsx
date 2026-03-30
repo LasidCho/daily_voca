@@ -77,13 +77,15 @@ export default function Admin() {
       try {
         const wb = XLSX.read(evt.target.result, {type:'binary'})
         const ws = wb.Sheets[wb.SheetNames[0]]
+        // 🔥 [Admin.jsx 수정 부분]
         const data = XLSX.utils.sheet_to_json(ws).map(r => ({
           word: r.word, 
           meaning_ko: r.meaning_ko, 
           synonyms: r.synonyms ? String(r.synonyms).split(',').map(s=>s.trim()) : [], 
           antonyms: r.antonyms ? String(r.antonyms).split(',').map(s=>s.trim()) : [], 
           group_id: parseInt(selectedGroup), 
-          difficulty: r.difficulty||1 
+          difficulty: r.difficulty||1,
+          pos: r.pos ? String(r.pos).trim() : null // ✨ [NEW] 엑셀에서 품사(pos) 읽어오기
         }))
         
         const { error } = await supabase.from('words').insert(data)
