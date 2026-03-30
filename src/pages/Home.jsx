@@ -363,9 +363,10 @@ export default function Home() {
               <div className="h-48 w-full">
                 {stats.history.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats.history}>
+                    <BarChart data={stats.history} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                       <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis hide domain={[0, 100]} />
+                      {/* 🔥 핵심: Y축을 숨기되, 0~100점으로 기준을 강력하게 고정! */}
+                      <YAxis hide domain={[0, 100]} type="number" />
                       <Tooltip
                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                         content={({ active, payload }) => {

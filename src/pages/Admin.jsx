@@ -306,20 +306,30 @@ export default function Admin() {
                   <div className="flex justify-between items-start mb-6"><div><h2 className="text-xl font-bold text-white">{viewingStudent.name} 학생 리포트</h2><p className="text-slate-400 text-sm">평균: {studentStats?.avgScore}점 / 총: {studentStats?.totalTests}회</p></div><button onClick={() => setViewingStudent(null)} className="text-slate-500 hover:text-white"><XCircle /></button></div>
                   {studentStats ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="h-40"><p className="text-sm text-slate-400 mb-2">성적 추이</p><ResponsiveContainer><BarChart data={studentStats.chartData}><XAxis dataKey="date" stroke="#94a3b8" fontSize={10} /><Bar dataKey="score" fill="#818cf8" /><Tooltip
-                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl z-50">
-                                <p className="text-slate-400 text-xs mb-1">{payload[0].payload.date}</p>
-                                <p className="text-white font-bold">{payload[0].value}점</p>
-                              </div>
-                            )
-                          }
-                          return null;
-                        }}
-                      /></BarChart></ResponsiveContainer></div>
+                      <div className="h-40"><p className="text-sm text-slate-400 mb-2">성적 추이</p><ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={stats.history} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                          <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                          {/* 🔥 핵심: Y축을 숨기되, 0~100점으로 기준을 강력하게 고정! */}
+                          <YAxis hide domain={[0, 100]} type="number" />
+                          <Tooltip
+                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-xl z-50">
+                                    <p className="text-slate-400 text-xs mb-1">{payload[0].payload.date}</p>
+                                    <p className="text-white font-bold">{payload[0].value}점</p>
+                                  </div>
+                                )
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                            {stats.history.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.score >= 80 ? '#4ade80' : entry.score >= 50 ? '#fbbf24' : '#f87171'} />)}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer></div>
                       <div><p className="text-sm text-slate-400 mb-2">오답 노트</p><div className="space-y-2">{studentStats.frequentWrongs.map((w, i) => <div key={i} className="flex justify-between text-sm bg-slate-900 p-2 rounded border border-slate-700"><span className="text-white">{w.word}</span><span className="text-red-400">{w.count}회</span></div>)}</div></div>
                     </div>
                   ) : <p className="text-center text-slate-500 py-10">기록 없음</p>}

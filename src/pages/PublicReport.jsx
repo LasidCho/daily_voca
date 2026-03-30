@@ -112,13 +112,10 @@ export default function PublicReport() {
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-green-400" /> 최근 성적 변화</h3>
               <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.history}>
+                  <BarChart data={stats.history} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                     <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                    <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                      {stats.history.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.score >= 80 ? '#4ade80' : entry.score >= 50 ? '#fbbf24' : '#f87171'} />
-                      ))}
-                    </Bar>
+                    {/* 🔥 핵심: Y축을 숨기되, 0~100점으로 기준을 강력하게 고정! */}
+                    <YAxis hide domain={[0, 100]} type="number" />
                     <Tooltip
                       cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                       content={({ active, payload }) => {
@@ -132,7 +129,11 @@ export default function PublicReport() {
                         }
                         return null;
                       }}
-                    />                  </BarChart>
+                    />
+                    <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                      {stats.history.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.score >= 80 ? '#4ade80' : entry.score >= 50 ? '#fbbf24' : '#f87171'} />)}
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
