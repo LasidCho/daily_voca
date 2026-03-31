@@ -286,7 +286,7 @@ export default function Home() {
                 </div>
                 <div className="bg-white/5 backdrop-blur-md p-8 rounded-3xl border border-white/10 text-center shadow-2xl relative">
                   <span className={`inline-block px-4 py-2 rounded-full text-sm font-bold mb-4 shadow-sm ${quizType === 'synonym' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-pink-500/20 text-pink-300'}`}>
-                    {quizType === 'synonym' ? '💡 다음 중 유의어에 해당하지 않는 것을 고르시오' : '💡 다음 중 반의어에 해당하지 않는 것을 고르시오'}
+                    {quizType === 'synonym' ? '💡 다음 중 유의어가 아닌 것을 고르시오' : '💡 다음 중 반의어가 아닌 것을 고르시오'}
                   </span>
                   <h2 className="text-4xl font-black text-white mb-2">{quizList[currentIndex].word}</h2>
                   <div className={`transition-all duration-500 overflow-hidden ${feedback ? 'max-h-20 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
